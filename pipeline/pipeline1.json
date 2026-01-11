@@ -36,7 +36,7 @@
 				"type": "ForEach",
 				"dependsOn": [
 					{
-						"activity": "Get File Config",
+						"activity": "Get File Config from SQL DB",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -45,7 +45,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"items": {
-						"value": "@activity('Get File Config').output.value",
+						"value": "@activity('Get File Config from SQL DB').output.value",
 						"type": "Expression"
 					},
 					"isSequential": false,
@@ -123,7 +123,7 @@
 				}
 			},
 			{
-				"name": "Get File Config",
+				"name": "Get File Config from SQL DB",
 				"type": "Lookup",
 				"dependsOn": [
 					{
