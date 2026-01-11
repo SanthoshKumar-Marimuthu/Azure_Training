@@ -1,0 +1,13 @@
+{
+	"name": "AzureSynapseLinkedService",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSynapseArtifacts",
+		"typeProperties": {
+			"endpoint": "https://synapsefreeworkspace.dev.azuresynapse.net",
+			"authentication": "MSI",
+			"workspaceResourceId": "/subscriptions/f92610f3-9610-4ac6-a7ae-22195a530172/resourceGroups/Free_RG/providers/Microsoft.Synapse/workspaces/synapsefreeworkspace"
+		}
+	}
+}

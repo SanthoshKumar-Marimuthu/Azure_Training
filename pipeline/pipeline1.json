@@ -1,0 +1,796 @@
+{
+	"name": "pipeline1",
+	"properties": {
+		"activities": [
+			{
+				"name": "Delete Old Files",
+				"type": "Delete",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "AdlsCSV",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileType": "empty"
+						}
+					},
+					"enableLogging": false,
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": false,
+						"wildcardFileName": "*.csv",
+						"enablePartitionDiscovery": false
+					}
+				}
+			},
+			{
+				"name": "Download All Files",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get File Config",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get File Config').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Download File from API",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "HttpReadSettings",
+										"requestMethod": "GET"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "ApiCSV",
+									"type": "DatasetReference",
+									"parameters": {
+										"url": {
+											"value": "@item().file_url",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "AdlsCSV",
+									"type": "DatasetReference",
+									"parameters": {
+										"FileType": {
+											"value": "@item().file_type",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Get File Config",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Delete Old Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "select file_type, file_url from file_config\nwhere is_active = 1",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQLTable",
+						"type": "DatasetReference",
+						"parameters": {
+							"TableName": "Customer"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Get File Names from ADLS2",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "Is Files downloaded",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "AdlsCSV",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileType": "empty"
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "Is Files downloaded",
+				"type": "Validation",
+				"dependsOn": [
+					{
+						"activity": "Download All Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "AdlsCSV",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileType": "People"
+						}
+					},
+					"timeout": "0.00:02:00",
+					"sleep": 10
+				}
+			},
+			{
+				"name": "Load All Files",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Is File",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Is File').output.Value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Truncate Table",
+							"type": "Script",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "AzureSqlDatabaseLinkedService",
+								"type": "LinkedServiceReference"
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "NonQuery",
+										"text": {
+											"value": "@concat('truncate table ',replace(item().name, '.csv', ''))",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						},
+						{
+							"name": "Check File Type",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Truncate Table",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@startswith(item().name, 'Customer')",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Bronze - People CSV to DB",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": false,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "AzureSqlSink",
+												"writeBehavior": "insert",
+												"sqlWriterUseTableLock": true,
+												"disableMetricsCollection": false
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"mappings": [
+													{
+														"source": {
+															"name": "Index",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "People_Index",
+															"type": "Int32",
+															"physicalType": "int"
+														}
+													},
+													{
+														"source": {
+															"name": "User Id",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "User_Id",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "First Name",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "First_Name",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Last Name",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Last_Name",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Sex",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Sex",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Email",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Email",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Phone",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Phone",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Date of birth",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Date_of_birth",
+															"type": "Date",
+															"physicalType": "date"
+														}
+													},
+													{
+														"source": {
+															"name": "Job Title",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Job_Title",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													}
+												],
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "AdlsCSV",
+												"type": "DatasetReference",
+												"parameters": {
+													"FileType": "People"
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "SQLTable",
+												"type": "DatasetReference",
+												"parameters": {
+													"TableName": "People"
+												}
+											}
+										]
+									},
+									{
+										"name": "Silver - People",
+										"type": "ExecuteDataFlow",
+										"dependsOn": [
+											{
+												"activity": "Bronze - People CSV to DB",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataflow": {
+												"referenceName": "Silver People",
+												"type": "DataFlowReference"
+											},
+											"compute": {
+												"coreCount": 8,
+												"computeType": "General"
+											},
+											"traceLevel": "Fine"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Bronze - Customer CSV to DB",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": false,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "AzureSqlSink",
+												"writeBehavior": "insert",
+												"sqlWriterUseTableLock": true,
+												"disableMetricsCollection": false
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"mappings": [
+													{
+														"source": {
+															"name": "Index",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Customer_Index",
+															"type": "Int32",
+															"physicalType": "int"
+														}
+													},
+													{
+														"source": {
+															"name": "Customer Id",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Customer_Id",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "First Name",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "First_Name",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Last Name",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Last_Name",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Company",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Company",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "City",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "City",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Country",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Country",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Phone 1",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Phone_1",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Phone 2",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Phone_2",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Email",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Email",
+															"type": "String",
+															"physicalType": "varchar"
+														}
+													},
+													{
+														"source": {
+															"name": "Subscription Date",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Subscription_Date",
+															"type": "Date",
+															"physicalType": "date"
+														}
+													},
+													{
+														"source": {
+															"name": "Website",
+															"type": "String",
+															"physicalType": "String"
+														},
+														"sink": {
+															"name": "Website",
+															"type": "String",
+															"physicalType": "nvarchar"
+														}
+													}
+												],
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "AdlsCSV",
+												"type": "DatasetReference",
+												"parameters": {
+													"FileType": "Customer"
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "SQLTable",
+												"type": "DatasetReference",
+												"parameters": {
+													"TableName": "Customer"
+												}
+											}
+										]
+									},
+									{
+										"name": "Silver - SP - SCD Type 2",
+										"type": "Lookup",
+										"dependsOn": [
+											{
+												"activity": "Bronze - Customer CSV to DB",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "AzureSqlSource",
+												"sqlReaderQuery": "declare @r int\nexec sp_populate_customer_silver @r output\nselect @r as deltaCount",
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											},
+											"dataset": {
+												"referenceName": "SQLTable",
+												"type": "DatasetReference",
+												"parameters": {
+													"TableName": "Customer"
+												}
+											}
+										}
+									},
+									{
+										"name": "Get Delta Count",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Silver - SP - SCD Type 2",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "CustDeltaCnt",
+											"value": {
+												"value": "@activity('Silver - SP - SCD Type 2').output.firstRow.deltaCount",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Is File",
+				"type": "Filter",
+				"dependsOn": [
+					{
+						"activity": "Get File Names from ADLS2",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get File Names from ADLS2').output.childItems",
+						"type": "Expression"
+					},
+					"condition": {
+						"value": "@equals(item().type, 'File')",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"variables": {
+			"CustDeltaCnt": {
+				"type": "Integer",
+				"defaultValue": 0
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-01-11T08:53:55Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

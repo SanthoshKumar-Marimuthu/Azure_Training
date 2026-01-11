@@ -1,0 +1,102 @@
+{
+	"name": "Silver People",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "PeopleSource",
+						"type": "DatasetReference"
+					},
+					"name": "BronzePeople"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "PeopleSink",
+						"type": "DatasetReference"
+					},
+					"name": "PeopleSilver"
+				}
+			],
+			"transformations": [
+				{
+					"name": "Select",
+					"description": "select required fields"
+				},
+				{
+					"name": "Transformation"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          People_Index as integer,",
+				"          User_Id as string,",
+				"          First_Name as string,",
+				"          Last_Name as string,",
+				"          Sex as string,",
+				"          Email as string,",
+				"          Phone as string,",
+				"          Date_of_birth as date,",
+				"          Job_Title as string,",
+				"          Load_Date as timestamp",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> BronzePeople",
+				"BronzePeople select(mapColumn(",
+				"          User_Id,",
+				"          First_Name,",
+				"          Last_Name,",
+				"          Sex,",
+				"          Email,",
+				"          Date_of_birth,",
+				"          Job_Title,",
+				"          Load_Date",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> Select",
+				"Select derive(Full_Name = concat(First_Name, ' ', Last_Name),",
+				"          Age = year(currentDate()) - year(Date_of_birth)\r",
+				"-\r",
+				"case(\r",
+				"    addMonths(Date_of_birth, (year(currentDate()) - year(Date_of_birth)) * 12) > currentDate()\r",
+				"    , 1, 0),",
+				"          Gender = case(lower(Sex)=='male', 'M', case(lower(Sex)=='female', 'F', Sex))) ~> Transformation",
+				"Transformation sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          Id as integer,",
+				"          Full_Name as string,",
+				"          Gender as string,",
+				"          Email_Address as string,",
+				"          DOB as date,",
+				"          Age as integer,",
+				"          Job_Title as string,",
+				"          Start_Date as timestamp,",
+				"          End_Date as timestamp",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     truncate:true,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          Full_Name,",
+				"          Gender,",
+				"          Email_Address = Email,",
+				"          DOB = Date_of_birth,",
+				"          Age,",
+				"          Job_Title",
+				"     )) ~> PeopleSilver"
+			]
+		}
+	}
+}

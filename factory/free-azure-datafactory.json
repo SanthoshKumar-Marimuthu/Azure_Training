@@ -1,0 +1,14 @@
+{
+	"name": "free-azure-datafactory",
+	"properties": {
+		"globalConfigurations": {
+			"PipelineBillingEnabled": "true"
+		}
+	},
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "f8d21e28-faae-45f5-9ef6-56ac9084884c",
+		"tenantId": "3812d502-b21f-4005-a6ef-817d9d16063c"
+	}
+}
