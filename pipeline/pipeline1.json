@@ -3,7 +3,7 @@
 	"properties": {
 		"activities": [
 			{
-				"name": "Delete Old Files",
+				"name": "Delete Old CSV Files",
 				"type": "Delete",
 				"dependsOn": [],
 				"policy": {
@@ -127,7 +127,7 @@
 				"type": "Lookup",
 				"dependsOn": [
 					{
-						"activity": "Delete Old Files",
+						"activity": "Delete Old CSV Files",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -252,10 +252,6 @@
 								"secureInput": false
 							},
 							"userProperties": [],
-							"linkedServiceName": {
-								"referenceName": "AzureSqlDatabaseLinkedService",
-								"type": "LinkedServiceReference"
-							},
 							"typeProperties": {
 								"scripts": [
 									{
